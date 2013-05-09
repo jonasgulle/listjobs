@@ -19,16 +19,14 @@ class MLStripper(HTMLParser):
 def strip_description(s):
 	stripper = MLStripper()
 	stripper.feed(s)
-	return " ".join(stripper.get_data().split())
+	return " ".join(stripper.get_data().split())[:DESCLENGTH]
 
 def update_cache_thread():
-	tempfile = "%s.part" % CACHEFILE
-	with open(tempfile, "w") as f:
+	print "Refreshing cache"
+	with open(CACHEFILE, "w") as f:
 		page = urlopen(URL)
 		f.write(page.read())
 		page.close()
-	os.remove(CACHEFILE)
-	os.rename(tempfile, CACHEFILE)
 
 def get_xml_feed():
 	# Do we have a previous cache?
@@ -65,7 +63,7 @@ def get_jobs():
 	return sorted(result, key=lambda k: k["date"], reverse=True)
 
 def format_job(job):
-	return "{date} [{apply-url}] ({title} in {location}) {description}... see {detail-url} for more\n".format(**job)
+	return "{date} [{apply-url}] ({title} in {location}) {description} See {detail-url} for more\n".format(**job)
 
 def save_all(filename):
 	with open(filename, "wt") as f:
@@ -91,7 +89,7 @@ def main():
 		print >> sys.stderr, "Usage: listjobs.py file [all|latest|search=term]"
 		return 1
 
-	filename, arg = sys.argv[1], sys.argv[2]
+	filename, arg = "%s/%s" % (FEEDDIR, sys.argv[1]), sys.argv[2]
 
 	if arg == "all":
 		save_all(filename)
