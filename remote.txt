@@ -1,0 +1,3 @@
+on *:TEXT:!listjobs *:#:{
+	msg $nick "Hej"
+}
