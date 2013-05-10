@@ -22,11 +22,23 @@ def strip_description(s):
 	return " ".join(stripper.get_data().split())[:DESCLENGTH]
 
 def update_cache_thread():
+	tempfile = "%s.part" % CACHEFILE
+	if os.path.isfile(tempfile):
+		print "Update is pending"
+		return
+
 	print "Refreshing cache"
-	with open(CACHEFILE, "w") as f:
-		page = urlopen(URL)
-		f.write(page.read())
-		page.close()
+
+	outfile = open(tempfile, "w")
+	page = urlopen(URL)
+	outfile.write(page.read())
+	page.close()
+	outfile.close()
+
+	if os.path.isfile(CACHEFILE):
+		os.remove(CACHEFILE)
+
+	os.rename(tempfile, CACHEFILE)
 
 def get_xml_feed():
 	# Do we have a previous cache?
@@ -65,38 +77,34 @@ def get_jobs():
 def format_job(job):
 	return "{date} [{apply-url}] ({title} in {location}) {description} See {detail-url} for more\n".format(**job)
 
-def save_all(filename):
-	with open(filename, "wt") as f:
-		for job in get_jobs():
-			f.write(format_job(job))
+def get_all():
+	return "".join([format_job(job) for job in get_jobs()])
 
-def save_latest(filename):
-	with open(filename, "wt") as f:
-		for job in get_jobs()[:20]:
-			f.write(format_job(job))
+def get_latest():
+	return "".join([format_job(job) for job in get_jobs()[:20]])
 
-def save_by_term(filename, term):
-	with open(filename, "wt") as f:
-		f.write("Searching for %s...\n" % term)
-		for job in get_jobs():
-			fields = "location region category description".split()	
-			for field in fields:
-				if term.lower() in job[field].lower():
-					f.write(format_job(job))
+def get_by_term(term):
+	ret = "Searching for %s...\n" % term
+	for job in get_jobs():
+		fields = "location region category description".split()	
+		for field in fields:
+			if term.lower() in job[field].lower():
+				ret += format_job(job)
+	return ret
 
 def main():
-	if len(sys.argv) != 3:
-		print >> sys.stderr, "Usage: listjobs.py file [all|latest|search=term]"
+	if len(sys.argv) != 2:
+		print >> sys.stderr, "Usage: listjobs.py [all|latest|search=term]"
 		return 1
 
-	filename, arg = "%s/%s" % (FEEDDIR, sys.argv[1]), sys.argv[2]
+	arg = sys.argv[1]
 
 	if arg == "all":
-		save_all(filename)
+		print get_all()
 	elif arg == "latest":
-		save_latest(filename)
+		print get_latest()
 	elif "search=" in arg:
-		save_by_term(filename, arg.split("=")[1])
+		print get_by_term(arg.split("=")[1])
 	else:
 		print >> sys.stderr, "Unknown argument"
 
