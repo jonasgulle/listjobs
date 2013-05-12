@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-
 from wsgiref.simple_server import make_server
 import listjobs
 

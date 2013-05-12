@@ -75,21 +75,21 @@ def get_jobs():
 	return sorted(result, key=lambda k: k["date"], reverse=True)
 
 def format_job(job):
-	return "{date} [{apply-url}] ({title} in {location}) {description} See {detail-url} for more\n".format(**job)
+	return "{date} [{apply-url}] ({title} in {location}) {description}... See {detail-url} for more".format(**job)
 
 def get_all():
-	return "".join([format_job(job) for job in get_jobs()])
+	return [format_job(job) for job in get_jobs()]
 
 def get_latest():
-	return "".join([format_job(job) for job in get_jobs()[:20]])
+	return [format_job(job) for job in get_jobs()[:20]]
 
 def get_by_term(term):
-	ret = "Searching for %s...\n" % term
+	ret = []
 	for job in get_jobs():
-		fields = "location region category description".split()	
+		fields = "location title region category description".split()	
 		for field in fields:
-			if term.lower() in job[field].lower():
-				ret += format_job(job)
+			if job[field].lower().find(term.lower()) != -1:
+				ret.append(format_job(job))
 	return ret
 
 def main():
@@ -102,7 +102,7 @@ def main():
 	if arg == "all":
 		print get_all()
 	elif arg == "latest":
-		print get_latest()
+		print "".join(get_latest())
 	elif "search=" in arg:
 		print get_by_term(arg.split("=")[1])
 	else:
