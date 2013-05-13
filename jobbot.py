@@ -1,11 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # vim: set et ts=4 sw=4:
-import os
-import pickle
-import random
-import re
-import sys
 from irc import RateLimitedDispatcher, IRCBot
 from datetime import datetime
 import listjobs
