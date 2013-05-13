@@ -4,6 +4,7 @@ from config import *
 from threading import Thread
 from urllib2 import urlopen
 from HTMLParser import HTMLParser
+from shorten import shorten
 import xml.etree.ElementTree as ET
 import datetime, time, os, sys
 
@@ -75,13 +76,18 @@ def get_jobs():
 	return sorted(result, key=lambda k: k["date"], reverse=True)
 
 def format_job(job):
-	return "{date} [{apply-url}] ({title} in {location}) {description}... See {detail-url} for more".format(**job)
+	return "%s | %s" % (job["title"], shorten(job["detail-url"]))
 
 def get_all():
 	return [format_job(job) for job in get_jobs()]
 
 def get_latest():
-	return [format_job(job) for job in get_jobs()[:20]]
+	num_latest = 10
+	jobs = get_jobs()
+	if len(jobs) > num_latest:
+		return [format_job(job) for job in jobs[:num_latest]]
+	else:
+		return [format_job(job) for job in jobs]
 
 def get_by_term(term):
 	ret = []
@@ -104,7 +110,7 @@ def main():
 	elif arg == "latest":
 		print "".join(get_latest())
 	elif "search=" in arg:
-		print get_by_term(arg.split("=")[1])
+		print "\n".join(get_by_term(arg.split("=")[1]))
 	else:
 		print >> sys.stderr, "Unknown argument"
 

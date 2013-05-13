@@ -148,4 +148,5 @@ class IRCBot(object):
         try:
             self.conn.enter_event_loop()
         except KeyboardInterrupt:
+            print "\nDisconnecting..."
             self.conn.disconnect()
