@@ -3,7 +3,7 @@
 # vim: set et ts=4 sw=4:
 from irc import RateLimitedDispatcher, IRCBot
 from datetime import datetime
-import listjobs
+from listjobs import scrape_jobs
 
 class JobsDispatcher(RateLimitedDispatcher):
     def __init__(self, *args, **kwargs):
@@ -13,42 +13,23 @@ class JobsDispatcher(RateLimitedDispatcher):
         self.send(message, nick=nick)
 
     def log(self, log):
-        print "%s %s" % (datetime.now(), log)
+        print "%s | %s" % (datetime.now(), log)
 
     def listlatest(self, sender, message, channel, is_ping, reply):
         self.log("%s asked for latest jobs" % sender)
-        self.reply_to("Please wait...", sender)
-        jobs = listjobs.get_latest()
-        if not len(jobs):
-            self.reply_to("Sorry, there are no jobs available right now", sender)
-            return
-        for job in jobs:
+        for job in scrape_jobs(limit=10):
             self.reply_to(job, sender)
-        self.reply_to("Done!", sender)
 
     def listjobs(self, sender, message, channel, is_ping, reply):
         self.log("%s asked for all jobs" % sender)
-        self.reply_to("Please wait...", sender)
-        jobs = listjobs.get_all()
-        if not len(jobs):
-            self.reply_to("Sorry, there are no jobs available right now", sender)
-            return
-        for job in jobs:
+        for job in scrape_jobs():
             self.reply_to(job, sender)
-        self.reply_to("Done!", sender)
 
     def listsearch(self, sender, message, channel, is_ping, reply):
         search = message.replace('!listsearch', '').strip().lower()
         self.log("%s searched for \"%s\"" % (sender, search))
-        self.reply_to("Please wait...", sender)
-        jobs = listjobs.get_by_term(search)
-        if not len(jobs):
-            self.reply_to("Sorry, no matches", sender)
-            return
-        self.reply_to("Found %d jobs" % len(jobs), sender)
-        for job in jobs:
+        for job in scrape_jobs(search=search):
             self.reply_to(job, sender)
-        self.reply_to("Done!", sender)
  
     def get_patterns(self):
         return (
@@ -57,13 +38,32 @@ class JobsDispatcher(RateLimitedDispatcher):
             ('^!listjobs', self.listjobs),
         )
 
+import threading
+import config
 
-host = "irc.gulle.se"
-port = 6667
-nick = "spotifyjobs"
-password = ""
-channels = ["#test"]
+class StoppableThread(threading.Thread):
+    def __init__(self, **kwargs):
+        super(StoppableThread, self).__init__(**kwargs)
+        self._stop = threading.Event()
 
-bot = JobsDispatcher()
-bot = IRCBot(host, port, nick, password, channels, [bot])
-bot.run_forever()
+    def stop(self):
+        print "Stopping..."
+        self._stop.set()
+
+    def stopped(self):
+        return self._stop.isSet()
+
+def bot_thread(arg):
+    bot = JobsDispatcher()
+    bot = IRCBot(arg["host"], arg["port"], arg["nick"], arg["password"], arg["channels"], [bot])
+    bot.run_forever()
+
+threads = [StoppableThread(target=bot_thread, args=[s]).start() for s in config.servers]
+
+try:
+    print "%d bots currently running" % len(threads)
+    print "Press Ctrl+C to abort"
+except KeyboardInterrupt:
+    print "Aborting..."
+    map(lambda t: t.stop(), threads)
+

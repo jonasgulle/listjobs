@@ -1,118 +1,66 @@
 #!/usr/bin/env python
 # -*- encoding: utf8 -*-
-from config import *
-from threading import Thread
+import config
 from urllib2 import urlopen
-from HTMLParser import HTMLParser
-from shorten import shorten
-import xml.etree.ElementTree as ET
-import datetime, time, os, sys
+from shorten import url_shorten
+from bs4 import BeautifulSoup
 
-class MLStripper(HTMLParser):
-	def __init__(self):
-		self.reset()
-		self.fed = []
-	def handle_data(self, d):
-		self.fed.append(d)
-	def get_data(self):
-		return "".join(self.fed)
-
-def strip_description(s):
-	stripper = MLStripper()
-	stripper.feed(s)
-	return " ".join(stripper.get_data().split())[:DESCLENGTH]
-
-def update_cache_thread():
-	tempfile = "%s.part" % CACHEFILE
-	if os.path.isfile(tempfile):
-		print "Update is pending"
-		return
-
-	print "Refreshing cache"
-
-	outfile = open(tempfile, "w")
-	page = urlopen(URL)
-	outfile.write(page.read())
+def scrape_jobs(limit=None, search=None):
+	page = urlopen(config.url)
+	soup = BeautifulSoup(page)
 	page.close()
-	outfile.close()
 
-	if os.path.isfile(CACHEFILE):
-		os.remove(CACHEFILE)
+	def is_vacoffer_class(tag):
+		return tag.has_attr("class") and "vacoffer" in tag["class"]
 
-	os.rename(tempfile, CACHEFILE)
+	def format_job(job):
+		return u"{title} | {location} | {url}".format(**job)
 
-def get_xml_feed():
-	# Do we have a previous cache?
-	if os.path.isfile(CACHEFILE):
-		# Is it time to refresh the cache?
-		if int((time.time() - os.path.getmtime(CACHEFILE)) / 60.0) > UPDATEINTERVAL:
-			thread = Thread(target=update_cache_thread)
-			thread.start()
-		return
-	else:
-		# First time running the script.
-		# Save the cache and wait for the thread to finish.
-		thread = Thread(target=update_cache_thread)
-		thread.start()
-		thread.join()
+	jobs = []
+	parent_div = soup.find("div", {"class": "vacbox2"})
+	for c in parent_div.find_all(is_vacoffer_class, limit=limit):
+		url = "https://www.spotify.com" + c.a.get("href")
+		title = c.a.contents[0].text
+		location = c.a.contents[1]
+		pos = location.find("-")
+		if pos != -1:
+			location = location[pos+1:].strip()
+		job = {"title": title, "location": location, "url": url}
 
-def get_jobs():
-	get_xml_feed()
-	tree = ET.parse(CACHEFILE)
-	root = tree.getroot()
-	# This is the fields we are extracting from each <job> node.
-	keys = ["title", "date", "category", "region", "location", "detail-url", "apply-url", "description"]
-	result = []
-	for job in root.iter("job"):
-		d = {}
-		for k in keys:
-			d[k] = job.find(k).text.encode("utf-8")
-		# Convert the date string to a real date
-		d["date"] = datetime.datetime.strptime(d["date"], "%m/%d/%Y").date()
-		# Strip all HTML from the description
-		d["description"] = strip_description(d["description"])
-		result.append(d)
-	# Return the list sorted by date (descending)
-	return sorted(result, key=lambda k: k["date"], reverse=True)
-
-def format_job(job):
-	return "%s | %s" % (job["title"], shorten(job["detail-url"]))
-
-def get_all():
-	return [format_job(job) for job in get_jobs()]
-
-def get_latest():
-	num_latest = 10
-	jobs = get_jobs()
-	if len(jobs) > num_latest:
-		return [format_job(job) for job in jobs[:num_latest]]
-	else:
-		return [format_job(job) for job in jobs]
-
-def get_by_term(term):
-	ret = []
-	for job in get_jobs():
-		fields = "location title region category description".split()	
-		for field in fields:
-			if job[field].lower().find(term.lower()) != -1:
-				ret.append(format_job(job))
-	return ret
+		if search:
+			try:
+				if "".join(job.values()).lower().find(search.lower()) > 0:
+					job["url"] = url_shorten(job["url"])
+					yield(format_job(job))
+			except UnicodeError:
+				pass
+		else:
+			job["url"] = url_shorten(job["url"])
+			yield(format_job(job))
 
 def main():
+	import sys
 	if len(sys.argv) != 2:
 		print >> sys.stderr, "Usage: listjobs.py [all|latest|search=term]"
 		return 1
 
 	arg = sys.argv[1]
 
+	def print_jobs(jobs):
+		for job in jobs:
+			print job
+
 	if arg == "all":
-		print get_all()
+		print_jobs(scrape_jobs())
 	elif arg == "latest":
-		print "".join(get_latest())
+		print_jobs(scrape_jobs(limit=10))
 	elif "search=" in arg:
-		print "\n".join(get_by_term(arg.split("=")[1]))
+		print_jobs(scrape_jobs(search=arg.split("=")[1]))
 	else:
 		print >> sys.stderr, "Unknown argument"
+		return 1
+
+	return 0
 
 if __name__ == "__main__":
 	exit(main())

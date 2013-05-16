@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 
 # The URL feed to use
-URL = "http://www.jobvite.com/CompanyJobs/Xml.aspx?c=qV49VfwN"
-# Name of the temporary cache
-CACHEFILE = "cache.xml"
-# Number of minutes between updating the file
-UPDATEINTERVAL = 60
-# Number of characters to save from the description
-DESCLENGTH = 100
+url = "https://www.spotify.com/se/jobs/vacancies/"
 
+# List of servers to connect to during startup.
+# Leave the password blank ("") if the server doesn't require a password.
+servers = [
+	{
+		"host": "irc.gulle.se",
+		"nick": "spotifyjobs",
+		"port": 6667,
+		"password": "",
+		"channels": ["#test"]
+	},
+	# Add another here.
+]

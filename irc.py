@@ -21,6 +21,7 @@ class IRCConnection(object):
         }
 
     def connect(self):
+        print "Connecting to %s:%d" % (self.host, self.port)
         self._sock = socket.create_connection((self.host, self.port)).makefile()
 
     def disconnect(self):
@@ -28,20 +29,25 @@ class IRCConnection(object):
         self._sock.close()
 
     def send(self, data):
-        self._sock.write('%s\r\n' % data)
+        data = u"%s\r\n" % data
+        #self._sock.write(u'%s\r\n' % data)
+        self._sock.write(data.encode("utf-8"))
         self._sock.flush()
 
     def authenticate(self):
+        print "Authenticating"
         if len(self.password):
             self.send('PASS %s' % self.password)
         self.send('NICK %s' % self.nick)
         self.send('USER %s %s bla :%s' % (self.nick, self.host, self.nick))
 
     def join(self, channel):
+        print "Joining %s" % channel
         channel = channel.lstrip('#')
         self.send('JOIN #%s' % channel)
 
     def part(self, channel):
+        print "Leaving %s" % channel
         channel = channel.lstrip('#')
         self.send('PART #%s' % channel)
 
@@ -113,7 +119,7 @@ class Dispatcher(object):
 
 
 class RateLimitedDispatcher(Dispatcher):
-    rate_limit = (1, 1.25) # every x events, wait y
+    rate_limit = (1, 1.0) # every x events, wait y
     
     def __init__(self):
         self.num_sent = 0
